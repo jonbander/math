@@ -213,6 +213,7 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef<boolean>(false);
   const strokePointsRef = useRef<Point[]>([]);
+  const autoCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentGuide = NUMBERS_GUIDES[currentNumIndex];
 
@@ -275,6 +276,8 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
   };
 
   useEffect(() => {
+    if (autoCheckTimerRef.current) clearTimeout(autoCheckTimerRef.current);
+    autoCheckTimerRef.current = null;
     if (document.fonts?.ready) {
       document.fonts.ready.then(() => drawTemplate());
     } else {
@@ -286,6 +289,10 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
     setAccuracyScore(null);
     arabicSpeech.speakNumber(currentGuide.num);
   }, [currentNumIndex]);
+
+  useEffect(() => () => {
+    if (autoCheckTimerRef.current) clearTimeout(autoCheckTimerRef.current);
+  }, []);
 
   // Touch and mouse coordinate helpers
   const getCanvasCoords = (e: PointerEvent) => {
@@ -302,7 +309,11 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
 
   const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
     e.preventDefault();
+    if (autoCheckTimerRef.current) clearTimeout(autoCheckTimerRef.current);
+    autoCheckTimerRef.current = null;
     isDrawingRef.current = true;
+    setEvaluationStatus('idle');
+    setAccuracyScore(null);
     e.currentTarget.setPointerCapture(e.pointerId);
     const { x, y } = getCanvasCoords(e.nativeEvent);
     const canvas = canvasRef.current;
@@ -346,16 +357,18 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
    * 3. Must cover at least 75% of the number's actual checkpoints within 28px.
    * 4. Out-of-bounds penalty: no more than 30% of drawn points can be far away (>45px) from the number's path.
    */
-  const performStrictEvaluation = () => {
+  const performStrictEvaluation = (showFailure = true) => {
     const points = strokePointsRef.current;
 
     // Reject if too few points (e.g. single tap or dot)
     if (points.length < 16) {
-      setEvaluationStatus('failed');
-      setAccuracyScore(20);
-      soundManager.playWrong();
-      arabicSpeech.speak('لم تكتمل الكتابة بعد! تتبّع الخط المنقّط بالكامل');
-      return;
+      if (showFailure) {
+        setEvaluationStatus('failed');
+        setAccuracyScore(20);
+        soundManager.playWrong();
+        arabicSpeech.speak('لم تكتمل الكتابة بعد! تتبّع الخط المنقّط بالكامل');
+      }
+      return false;
     }
 
     const checkpoints = currentGuide.checkpoints;
@@ -425,16 +438,25 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
       if (onBadgeUnlock && currentGuide.num === 10) {
         onBadgeUnlock('number_writer');
       }
+      return true;
     } else {
-      setEvaluationStatus('failed');
-      soundManager.playWrong();
-      arabicSpeech.speak('حاول مرة أخرى يا بطل! تتبّع الخط المنقّط بدقة دون الخروج عن المسار');
+      if (showFailure) {
+        setEvaluationStatus('failed');
+        soundManager.playWrong();
+        arabicSpeech.speak('حاول مرة أخرى يا بطل! تتبّع الخط المنقّط بدقة دون الخروج عن المسار');
+      }
+      return false;
     }
   };
 
   const stopDrawing = () => {
     if (!isDrawingRef.current) return;
     isDrawingRef.current = false;
+    if (autoCheckTimerRef.current) clearTimeout(autoCheckTimerRef.current);
+    autoCheckTimerRef.current = setTimeout(() => {
+      autoCheckTimerRef.current = null;
+      performStrictEvaluation(false);
+    }, 1800);
   };
 
   // Reset and try again
@@ -546,11 +568,11 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
               <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-2.5 flex items-center justify-between gap-2 text-xs font-bold text-slate-600">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <span>✍️</span>
-                  <span className="truncate">تتبّع الخط المنقّط بالفرشاة بدقة</span>
+                  <span className="truncate">تتبّع الخط؛ سيفحص التطبيق كتابتك تلقائيًا بعد توقف قصير</span>
                 </div>
                 {pointsCount >= 16 && (
                   <button
-                    onClick={performStrictEvaluation}
+                    onClick={() => performStrictEvaluation()}
                     className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black shadow-xs cursor-pointer shrink-0"
                   >
                     تحقق من خطي 🌟
