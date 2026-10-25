@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-opacity="0.25" />
+    </filter>
+  </defs>
+
+  <!-- Background rounded squircle with safe-zone margin for Android maskable icon -->
+  <rect width="512" height="512" rx="128" fill="url(#bg)" />
+
+  <!-- Inner cheerful background circle -->
+  <circle cx="256" cy="256" r="200" fill="#FEF3C7" opacity="0.9" />
+
+  <!-- Eastern Arabic Numerals ١ ٢ ٣ -->
+  <text x="256" y="275" font-family="'Tajawal', 'Readex Pro', sans-serif" font-weight="900" font-size="140" fill="#B45309" text-anchor="middle" filter="url(#shadow)">
+    ١٢٣
+  </text>
+
+  <!-- Friendly Star -->
+  <polygon points="140,130 152,156 180,160 160,180 164,208 140,195 116,208 120,180 100,160 128,156" fill="#FBBF24" stroke="#F59E0B" stroke-width="4" />
+
+  <!-- Friendly Pencil -->
+  <g transform="translate(340, 130) rotate(45)">
+    <rect x="-10" y="-30" width="20" height="60" rx="4" fill="#3B82F6" />
+    <polygon points="-10,-30 0,-45 10,-30" fill="#FDE047" />
+    <polygon points="-3,-40 0,-45 3,-40" fill="#1E293B" />
+    <rect x="-10" y="20" width="20" height="10" rx="2" fill="#F43F5E" />
+  </g>
+
+  <!-- Bottom subtitle -->
+  <text x="256" y="380" font-family="'Tajawal', 'Readex Pro', sans-serif" font-weight="800" font-size="44" fill="#92400E" text-anchor="middle">
+    أبطال الحساب
+  </text>
+</svg>

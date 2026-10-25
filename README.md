@@ -1,11 +1,107 @@
-<div align="center">
+# مغامرة الأرقام والحساب للأطفال (عمر ٦ سنوات) 🌟
+### Math Heroes - Educational Math Game for Kids
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+تطبيق ولعبة تعليمية تفاعلية ممتعة باللغة العربية مخصصة لأطفال عمر ست سنوات (الصف الأول والتمهيدي)، لتعليم:
+1. ✏️ **كتابة ونطق الأعداد من ١ إلى ١٠** مع سبورة تتبّع تفاعلية وتحقق ذكي من الدقة.
+2. ➕ **الجمع البسيط حتى ١٠** عبر قصص مصورة وسلال فواكه ونجوم وأقلام.
+3. ➖ **الطرح المرح** بشطب وأخذ العناصر لمعرفة الباقي.
+4. ⚖️ **ميزان المقارنة التفاعلي** لمعرفة الأكبر (>) والأصغر (<) واليساوي (=) وقاعدة فم التمساح.
+5. 🔬 **مختبر الحساب التفاعلي** وصانع المسائل الحسابية المخصصة.
 
-  <h1>Built with AI Studio</h2>
+---
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## 📱 كيفية تحويل هذا المشروع إلى تطبيق أندرويد (APK)
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+المشروع مُجهّز بالكامل وبأعلى المعايير لتحويله إلى تطبيق أندرويد APK عبر عدة طرق سهلة:
 
-</div>
+---
+
+### 🚀 الطريقة الأولى: البناء التلقائي عبر GitHub Actions (الأسهل دون تثبيت أي برامج!)
+المشروع يحتوي على ملف سير العمل `.github/workflows/build-apk.yml`. بمجرد رفع هذا المشروع إلى حسابك في **GitHub**:
+1. ارفع المشروع إلى مستودع جديد (Repository) على GitHub.
+2. اذهب إلى تبويب **Actions** في صفحة المستودع.
+3. ستجد مهمة البناء **Build Android APK** تعمل تلقائياً.
+4. بمجرد انتهائها (تستغرق حوالي دقيقتين)، اضغط عليها وستجد ملف الـ APK جاهزاً للتحميل في قسم **Artifacts** باسم:
+   `MathHeroes-Kids-App-Debug-APK`
+5. انقله لهاتفك وثبته مباشرة!
+
+---
+
+### 💻 الطريقة الثانية: محلياً عبر Capacitor و Android Studio
+
+1. **تثبيت الحزم وبناء المشروع:**
+   ```bash
+   npm install
+   npm run build
+   ```
+
+2. **تهيئة وإضافة منصة الأندرويد:**
+   ```bash
+   npm run cap:add
+   npm run cap:sync
+   ```
+
+3. **فتح المشروع في Android Studio:**
+   ```bash
+   npm run cap:open
+   ```
+
+4. **استخراج ملف الـ APK:**
+   - من القائمة العلوية في Android Studio:
+     `Build > Build Bundle(s) / APK(s) > Build APK(s)`
+   - سيظهر لك إشعار يوضح مسار ملف الـ `app-debug.apk` الجاهز للتثبيت على الهواتف.
+
+---
+
+### 🌐 الطريقة الثالثة: عبر موقع PWABuilder (بنقرة واحدة مجاناً)
+
+المشروع مزود بملف `manifest.json` وأيقونات PWA متوافقة بنسبة 100%:
+1. ارفع المشروع على أي استضافة ويب (مثل Vercel أو Netlify أو GitHub Pages).
+2. افتح موقع: [https://www.pwabuilder.com](https://www.pwabuilder.com)
+3. ضع رابط موقعك واضغط **Start**.
+4. اضغط على **Android Package** ثم **Generate APK**.
+5. ستحصل على ملف APK جاهز فوراً للتحميل والتثبيت على أي هاتف أندرويد.
+
+---
+
+## 🛠️ تشغيل المشروع محلياً في بيئة التطوير (Development)
+
+```bash
+# تثبيت الاعتماديات
+npm install
+
+# تشغيل خادم التطوير
+npm run dev
+
+# بناء النسخة الإنتاجية
+npm run build
+```
+
+---
+
+## 📋 هيكلية المشروع (Project Structure)
+
+```text
+├── .github/workflows/build-apk.yml  # سكريبت بناء الـ APK التلقائي في GitHub
+├── capacitor.config.json           # إعدادات تحويل الويب إلى تطبيق أندرويد
+├── public/
+│   ├── manifest.json               # ملف تعريف تطبيق الويب (PWA Manifest)
+│   ├── icon.svg                    # أيقونة التطبيق المتجهة عالية الدقة
+│   ├── icon-192.png                # أيقونة الهواتف (192x192)
+│   └── icon-512.png                # أيقونة المتجر والهواتف (512x512)
+├── src/
+│   ├── components/
+│   │   ├── NumberTracingCanvas.tsx # سبورة كتابة ونطق الأعداد (١ - ١٠)
+│   │   ├── SimplifiedKidsMath.tsx  # الجمع والطرح المبسط وصانع المسائل
+│   │   ├── InteractiveBalanceScale.tsx # ميزان المقارنة التفاعلي
+│   │   ├── InteractiveExploreLab.tsx   # مختبر الحساب الحر
+│   │   ├── HomePageMenu.tsx        # البوابة الرئيسية للخيارات
+│   │   └── ManipulativeIcon.tsx    # النجوم والتفاح والأقلام والكرات
+│   ├── utils/
+│   │   ├── arabicSpeech.ts         # محرك النطق الصوتي العربي
+│   │   ├── soundEffects.ts         # المؤثرات الصوتية والموسيقى
+│   │   └── arabicNumerals.ts       # الأرقام العربية المشرقية (١، ٢، ٣)
+│   ├── App.tsx                     # التطبيق الرئيسي
+│   └── main.tsx
+└── package.json
+```
