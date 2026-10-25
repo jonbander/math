@@ -19,6 +19,14 @@ import { InteractiveBalanceScale } from './components/InteractiveBalanceScale';
 import { SpeedQuizMode } from './components/SpeedQuizMode';
 import { BadgesModal } from './components/BadgesModal';
 import { AboutPage } from './components/AboutPage';
+import {
+  addCompletedTask,
+  clearSavedProgress,
+  createEmptyProgress,
+  loadProgress,
+  saveProgress,
+  type CompletedTask,
+} from './utils/progressStorage';
 
 const INITIAL_BADGES: AchievementBadge[] = [
   {
@@ -92,7 +100,9 @@ export default function App() {
   const [activeMode, setActiveMode] = useState<ActiveAppMode>('home');
   const [numeralSystem, setNumeralSystem] = useState<NumeralSystem>('eastern');
   const [isSoundMuted, setIsSoundMuted] = useState<boolean>(soundManager.getMuted());
-  const [badges, setBadges] = useState<AchievementBadge[]>(INITIAL_BADGES);
+  const [progressAtStartup] = useState(() => loadProgress(INITIAL_BADGES));
+  const [badges, setBadges] = useState<AchievementBadge[]>(progressAtStartup.badges);
+  const [completedTasks, setCompletedTasks] = useState<CompletedTask[]>(progressAtStartup.completedTasks);
   const [isBadgesModalOpen, setIsBadgesModalOpen] = useState<boolean>(false);
   const [notification, setNotification] = useState<string | null>(null);
   const [speechStatus, setSpeechStatus] = useState<SpeechStatus>('idle');
@@ -101,6 +111,10 @@ export default function App() {
     const unsubscribe = arabicSpeech.subscribe(setSpeechStatus);
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    saveProgress({ badges, completedTasks });
+  }, [badges, completedTasks]);
 
   const handleToggleSound = () => {
     const muted = soundManager.toggleMute();
@@ -132,11 +146,24 @@ export default function App() {
           });
           setNotification(`🎉 مبارك! حصلت على وسام جديد: ${b.title}!`);
           setTimeout(() => setNotification(null), 4000);
-          return { ...b, unlocked: true };
+          return { ...b, unlocked: true, unlockedAt: new Date().toISOString() };
         }
         return b;
       })
     );
+  };
+
+  const handleTaskCompleted = (taskId: string, title: string) => {
+    setCompletedTasks((previous) => addCompletedTask(previous, taskId, title));
+  };
+
+  const handleResetProgress = () => {
+    const emptyProgress = createEmptyProgress(INITIAL_BADGES);
+    clearSavedProgress();
+    setBadges(emptyProgress.badges);
+    setCompletedTasks(emptyProgress.completedTasks);
+    setNotification('تم مسح التقدم والمهام المحفوظة على هذا الجهاز.');
+    window.setTimeout(() => setNotification(null), 4000);
   };
 
   const unlockedCount = badges.filter((b) => b.unlocked).length;
@@ -200,6 +227,7 @@ export default function App() {
             numeralSystem={numeralSystem}
             onProceedToMath={() => setActiveMode('addition')}
             onBadgeUnlock={handleBadgeUnlock}
+            onTaskCompleted={handleTaskCompleted}
             onGoHome={() => setActiveMode('home')}
           />
         )}
@@ -210,6 +238,7 @@ export default function App() {
             numeralSystem={numeralSystem}
             initialTab="addition"
             onBadgeUnlock={handleBadgeUnlock}
+            onTaskCompleted={handleTaskCompleted}
             onGoToScale={() => setActiveMode('scale')}
             onGoHome={() => setActiveMode('home')}
           />
@@ -221,6 +250,7 @@ export default function App() {
             numeralSystem={numeralSystem}
             initialTab="subtraction"
             onBadgeUnlock={handleBadgeUnlock}
+            onTaskCompleted={handleTaskCompleted}
             onGoToScale={() => setActiveMode('scale')}
             onGoHome={() => setActiveMode('home')}
           />
@@ -230,6 +260,7 @@ export default function App() {
         {activeMode === 'scale' && (
           <InteractiveBalanceScale
             numeralSystem={numeralSystem}
+            onTaskCompleted={handleTaskCompleted}
             onGoHome={() => setActiveMode('home')}
           />
         )}
@@ -313,6 +344,7 @@ export default function App() {
             <AdventureGameMode
               numeralSystem={numeralSystem}
               onBadgeUnlock={handleBadgeUnlock}
+              onTaskCompleted={handleTaskCompleted}
             />
           </div>
         )}
@@ -353,11 +385,18 @@ export default function App() {
                 </button>
               </div>
             </div>
-            <SpeedQuizMode numeralSystem={numeralSystem} />
+            <SpeedQuizMode numeralSystem={numeralSystem} onTaskCompleted={handleTaskCompleted} />
           </div>
         )}
 
-        {activeMode === 'about' && <AboutPage onGoHome={() => setActiveMode('home')} />}
+        {activeMode === 'about' && (
+          <AboutPage
+            onGoHome={() => setActiveMode('home')}
+            completedTasks={completedTasks}
+            unlockedBadgesCount={unlockedCount}
+            onResetProgress={handleResetProgress}
+          />
+        )}
       </main>
 
       {/* Badges Modal */}

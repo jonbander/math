@@ -14,12 +14,14 @@ interface InteractiveBalanceScaleProps {
   numeralSystem: NumeralSystem;
   defaultTheme?: ItemTheme;
   onGoHome?: () => void;
+  onTaskCompleted?: (id: string, title: string) => void;
 }
 
 export const InteractiveBalanceScale: React.FC<InteractiveBalanceScaleProps> = ({
   numeralSystem,
   defaultTheme = 'apples',
   onGoHome,
+  onTaskCompleted,
 }) => {
   const [theme, setTheme] = useState<ItemTheme>(defaultTheme);
   const [leftCount, setLeftCount] = useState<number>(3);
@@ -57,6 +59,10 @@ export const InteractiveBalanceScale: React.FC<InteractiveBalanceScaleProps> = (
         spread: 60,
         origin: { y: 0.7 },
       });
+      onTaskCompleted?.(
+        `scale:${leftCount}:${rightCount}`,
+        `مقارنة ${formatNum(leftCount, numeralSystem)} و${formatNum(rightCount, numeralSystem)}`,
+      );
     } else {
       soundManager.playWrong();
       setFeedback({

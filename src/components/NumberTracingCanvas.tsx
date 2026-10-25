@@ -17,6 +17,7 @@ interface NumberTracingCanvasProps {
   numeralSystem: NumeralSystem;
   onProceedToMath?: () => void;
   onBadgeUnlock?: (id: string) => void;
+  onTaskCompleted?: (id: string, title: string) => void;
   onGoHome?: () => void;
 }
 
@@ -125,6 +126,7 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
   numeralSystem,
   onProceedToMath,
   onBadgeUnlock,
+  onTaskCompleted,
   onGoHome,
 }) => {
   const [currentNumIndex, setCurrentNumIndex] = useState<number>(0);
@@ -342,6 +344,7 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
       if (onBadgeUnlock && currentGuide.num === 10) {
         onBadgeUnlock('number_writer');
       }
+      onTaskCompleted?.(`writing:number:${currentGuide.num}`, `كتابة الرقم ${currentGuide.easternChar}`);
       return true;
     } else {
       if (showFailure) {

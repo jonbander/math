@@ -19,11 +19,13 @@ import { VisualMathDisplay } from './VisualMathDisplay';
 interface AdventureGameModeProps {
   numeralSystem: NumeralSystem;
   onBadgeUnlock?: (badgeId: string) => void;
+  onTaskCompleted?: (id: string, title: string) => void;
 }
 
 export const AdventureGameMode: React.FC<AdventureGameModeProps> = ({
   numeralSystem,
   onBadgeUnlock,
+  onTaskCompleted,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<OperationKind | 'mixed'>('addition');
   const [currentProblemIndex, setCurrentProblemIndex] = useState<number>(0);
@@ -226,6 +228,10 @@ export const AdventureGameMode: React.FC<AdventureGameModeProps> = ({
       if (onBadgeUnlock) {
         onBadgeUnlock('round_champion');
       }
+      onTaskCompleted?.(
+        `adventure:round:${selectedCategory}`,
+        `إنهاء جولة المغامرة (${selectedCategory === 'mixed' ? 'مختلطة' : OPERATIONS_META[selectedCategory].title})`,
+      );
     }
   };
 

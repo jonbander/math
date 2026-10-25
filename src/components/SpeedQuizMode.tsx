@@ -11,6 +11,7 @@ import { soundManager } from '../utils/soundEffects';
 
 interface SpeedQuizModeProps {
   numeralSystem: NumeralSystem;
+  onTaskCompleted?: (id: string, title: string) => void;
 }
 
 interface QuickQuestion {
@@ -20,7 +21,7 @@ interface QuickQuestion {
   emoji: string;
 }
 
-export const SpeedQuizMode: React.FC<SpeedQuizModeProps> = ({ numeralSystem }) => {
+export const SpeedQuizMode: React.FC<SpeedQuizModeProps> = ({ numeralSystem, onTaskCompleted }) => {
   const [timeLeft, setTimeLeft] = useState<number>(60);
   const [isActive, setIsActive] = useState<boolean>(false);
   const [isFinished, setIsFinished] = useState<boolean>(false);
@@ -101,6 +102,7 @@ export const SpeedQuizMode: React.FC<SpeedQuizModeProps> = ({ numeralSystem }) =
     } else if (isActive && timeLeft === 0) {
       setIsActive(false);
       setIsFinished(true);
+      onTaskCompleted?.('speed-quiz:one-minute', 'إنهاء تحدي الدقيقة');
       soundManager.playCheer();
       confetti({
         particleCount: 80,

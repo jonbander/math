@@ -14,6 +14,7 @@ import { ManipulativeIcon } from './ManipulativeIcon';
 interface SimplifiedKidsMathProps {
   numeralSystem: NumeralSystem;
   onBadgeUnlock?: (badgeId: string) => void;
+  onTaskCompleted?: (id: string, title: string) => void;
   onGoToScale?: () => void;
   onGoHome?: () => void;
   initialTab?: 'addition' | 'subtraction';
@@ -305,6 +306,7 @@ const RICH_SAMPLE_STORIES: SimpleStoryProblem[] = [
 export const SimplifiedKidsMath: React.FC<SimplifiedKidsMathProps> = ({
   numeralSystem,
   onBadgeUnlock,
+  onTaskCompleted,
   onGoToScale,
   onGoHome,
   initialTab = 'addition',
@@ -380,6 +382,10 @@ export const SimplifiedKidsMath: React.FC<SimplifiedKidsMathProps> = ({
         if (activeTab === 'addition') onBadgeUnlock('addition_star');
         if (activeTab === 'subtraction') onBadgeUnlock('subtraction_hero');
       }
+      onTaskCompleted?.(
+        `${activeTab}:${currentStory.id}`,
+        `${activeTab === 'addition' ? 'مسألة جمع' : 'مسألة طرح'}: ${currentStory.storyTitle}`,
+      );
     } else {
       soundManager.playWrong();
       arabicSpeech.speak('حاول مرة أخرى! انظر إلى العناصر وعدّها بأصابعك');
