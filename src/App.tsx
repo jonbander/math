@@ -3,10 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import confetti from 'canvas-confetti';
 import { ActiveAppMode, AchievementBadge, NumeralSystem } from './types/math';
 import { soundManager } from './utils/soundEffects';
+import { arabicSpeech, type SpeechStatus } from './utils/arabicSpeech';
 import { Header } from './components/Header';
 import { HomePageMenu } from './components/HomePageMenu';
 import { NumberTracingCanvas } from './components/NumberTracingCanvas';
@@ -93,10 +95,17 @@ export default function App() {
   const [badges, setBadges] = useState<AchievementBadge[]>(INITIAL_BADGES);
   const [isBadgesModalOpen, setIsBadgesModalOpen] = useState<boolean>(false);
   const [notification, setNotification] = useState<string | null>(null);
+  const [speechStatus, setSpeechStatus] = useState<SpeechStatus>('idle');
+
+  useEffect(() => {
+    const unsubscribe = arabicSpeech.subscribe(setSpeechStatus);
+    return () => unsubscribe();
+  }, []);
 
   const handleToggleSound = () => {
     const muted = soundManager.toggleMute();
     setIsSoundMuted(muted);
+    arabicSpeech.setMuted(muted);
     if (!muted) {
       soundManager.playPop();
     }
@@ -153,6 +162,27 @@ export default function App() {
         onOpenBadges={() => setIsBadgesModalOpen(true)}
         unlockedBadgesCount={unlockedCount}
       />
+
+      {(speechStatus === 'needs-arabic-voice' || speechStatus === 'error') && (
+        <div role="alert" aria-live="assertive" dir="rtl" className="mx-auto mt-3 w-[calc(100%-2rem)] max-w-5xl rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>
+              {speechStatus === 'needs-arabic-voice'
+                ? 'لا يتوفر صوت عربي مثبت على الجهاز. ثبّت بيانات النطق العربية من إعدادات تحويل النص إلى كلام ثم أعد المحاولة.'
+                : 'تعذّر تشغيل النطق. تحقق من مستوى صوت الوسائط وخدمة تحويل النص إلى كلام العربية ثم أعد المحاولة.'}
+            </span>
+            {Capacitor.isNativePlatform() && (
+              <button
+                type="button"
+                onClick={() => void arabicSpeech.openArabicVoiceInstaller()}
+                className="shrink-0 rounded-lg bg-amber-700 px-3 py-2 font-bold text-white hover:bg-amber-800"
+              >
+                إعداد الصوت العربي
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main Container */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">

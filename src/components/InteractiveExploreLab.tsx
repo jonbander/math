@@ -13,6 +13,7 @@ import {
   toArabicWords,
 } from '../utils/arabicNumerals';
 import { soundManager } from '../utils/soundEffects';
+import { arabicSpeech } from '../utils/arabicSpeech';
 import { VisualMathDisplay } from './VisualMathDisplay';
 
 interface InteractiveExploreLabProps {
@@ -61,12 +62,9 @@ export const InteractiveExploreLab: React.FC<InteractiveExploreLabProps> = ({ nu
     }
   };
 
-  // Friendly speech reader using Web Speech API in Arabic
-  const handleSpeak = () => {
+  // Keep all spoken instructions on the shared native/web speech service.
+  const handleSpeak = async () => {
     soundManager.playClick();
-    if (!('speechSynthesis' in window)) return;
-
-    window.speechSynthesis.cancel();
     let speechText = '';
     const n1Words = toArabicWords(num1);
     const n2Words = toArabicWords(num2);
@@ -97,15 +95,12 @@ export const InteractiveExploreLab: React.FC<InteractiveExploreLabProps> = ({ nu
       }
     }
 
-    const utterance = new SpeechSynthesisUtterance(speechText);
-    utterance.lang = 'ar-SA';
-    utterance.rate = 0.85;
-
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-
-    window.speechSynthesis.speak(utterance);
+    setIsSpeaking(true);
+    try {
+      await arabicSpeech.speak(speechText, 0.85);
+    } finally {
+      setIsSpeaking(false);
+    }
   };
 
   // Preset fun examples

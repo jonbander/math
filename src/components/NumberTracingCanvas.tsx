@@ -4,11 +4,13 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 import confetti from 'canvas-confetti';
 import { ItemTheme, NumeralSystem } from '../types/math';
 import { formatNum, getItemTheme } from '../utils/arabicNumerals';
 import { soundManager } from '../utils/soundEffects';
 import { arabicSpeech } from '../utils/arabicSpeech';
+import { alphaToMask, matchHandwriting, type HandwritingPoint } from '../utils/handwritingMatcher';
 import { ManipulativeIcon } from './ManipulativeIcon';
 
 interface NumberTracingCanvasProps {
@@ -23,25 +25,8 @@ interface Point {
   y: number;
 }
 
-const distanceToSegment = (point: Point, start: Point, end: Point) => {
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const lengthSquared = dx * dx + dy * dy;
-  if (lengthSquared === 0) return Math.hypot(point.x - start.x, point.y - start.y);
-  const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared));
-  return Math.hypot(point.x - (start.x + t * dx), point.y - (start.y + t * dy));
-};
+const GLYPH_FONT = '900 150px "Tajawal", "Readex Pro", sans-serif';
 
-const distanceToGuide = (point: Point, checkpoints: Point[], closePath: boolean) => {
-  let closest = Number.POSITIVE_INFINITY;
-  for (let i = 0; i < checkpoints.length - 1; i++) {
-    closest = Math.min(closest, distanceToSegment(point, checkpoints[i], checkpoints[i + 1]));
-  }
-  if (closePath && checkpoints.length > 2) {
-    closest = Math.min(closest, distanceToSegment(point, checkpoints[checkpoints.length - 1], checkpoints[0]));
-  }
-  return closest;
-};
 
 interface NumberGuide {
   num: number;
@@ -50,170 +35,89 @@ interface NumberGuide {
   strokeHint: string;
   fingerEmoji: string;
   defaultTheme: ItemTheme;
-  checkpoints: Point[];
 }
 
-// Checkpoints calibrated for a 320x260 canvas, centered at (160, 125)
+// The same rendered glyph is used for the dotted tracing guide and answer evaluation.
 const NUMBERS_GUIDES: NumberGuide[] = [
   {
     num: 1,
     easternChar: '١',
     word: 'واحد',
-    strokeHint: 'ارسم خطاً مستقيماً من النقطة الخضراء للأعلى إلى الأسفل ⬇️',
+    strokeHint: 'تتبّع شكل الرقم المنقّط كاملاً بهدوء ✏️',
     fingerEmoji: '☝️',
     defaultTheme: 'apples',
-    checkpoints: [
-      { x: 160, y: 55 },
-      { x: 160, y: 95 },
-      { x: 160, y: 135 },
-      { x: 160, y: 175 },
-      { x: 160, y: 205 },
-    ],
   },
   {
     num: 2,
     easternChar: '٢',
     word: 'اثنان',
-    strokeHint: 'ابدأ بسنّة متجهة لليمين ثم انزل بخط مستقيم ➡️⬇️',
+    strokeHint: 'تتبّع شكل الرقم المنقّط كاملاً بهدوء ✏️',
     fingerEmoji: '✌️',
     defaultTheme: 'stars',
-    checkpoints: [
-      { x: 130, y: 70 },
-      { x: 165, y: 65 },
-      { x: 190, y: 75 },
-      { x: 185, y: 110 },
-      { x: 165, y: 150 },
-      { x: 160, y: 190 },
-      { x: 160, y: 210 },
-    ],
   },
   {
     num: 3,
     easternChar: '٣',
     word: 'ثلاثة',
-    strokeHint: 'ارسم سنّة ثم سنّة ثانية ثم انزل للأسفل 🔱',
+    strokeHint: 'تتبّع شكل الرقم المنقّط كاملاً بهدوء ✏️',
     fingerEmoji: '🤟',
     defaultTheme: 'pencils',
-    checkpoints: [
-      { x: 120, y: 75 },
-      { x: 140, y: 90 },
-      { x: 160, y: 75 },
-      { x: 180, y: 90 },
-      { x: 200, y: 75 },
-      { x: 165, y: 140 },
-      { x: 160, y: 200 },
-    ],
   },
   {
     num: 4,
     easternChar: '٤',
     word: 'أربعة',
-    strokeHint: 'ارسم نصف دائرة صغيرة ثم نصف دائرة أخرى تحتها 🔄',
+    strokeHint: 'تتبّع شكل الرقم المنقّط كاملاً بهدوء ✏️',
     fingerEmoji: '🖐️',
     defaultTheme: 'balls',
-    checkpoints: [
-      { x: 180, y: 70 },
-      { x: 145, y: 100 },
-      { x: 175, y: 130 },
-      { x: 140, y: 165 },
-      { x: 165, y: 205 },
-    ],
   },
   {
     num: 5,
     easternChar: '٥',
     word: 'خمسة',
-    strokeHint: 'ارسم دائرة مغلقة لطيفة مثل الكعكة أو الحلقة ⭕',
+    strokeHint: 'تتبّع شكل الرقم المنقّط كاملاً بهدوء ✏️',
     fingerEmoji: '✋',
     defaultTheme: 'oranges',
-    checkpoints: [
-      { x: 160, y: 70 },
-      { x: 195, y: 95 },
-      { x: 205, y: 130 },
-      { x: 185, y: 170 },
-      { x: 160, y: 180 },
-      { x: 135, y: 170 },
-      { x: 115, y: 130 },
-      { x: 125, y: 95 },
-    ],
   },
   {
     num: 6,
     easternChar: '٦',
     word: 'ستة',
-    strokeHint: 'ابدأ بسنّة متجهة لليسار ثم انزل للأسفل ⬅️⬇️',
+    strokeHint: 'تتبّع شكل الرقم المنقّط كاملاً بهدوء ✏️',
     fingerEmoji: '✋☝️',
     defaultTheme: 'candies',
-    checkpoints: [
-      { x: 190, y: 75 },
-      { x: 155, y: 70 },
-      { x: 130, y: 75 },
-      { x: 135, y: 115 },
-      { x: 155, y: 150 },
-      { x: 160, y: 200 },
-    ],
   },
   {
     num: 7,
     easternChar: '٧',
     word: 'سبعة',
-    strokeHint: 'انزل بميل ثم اصعد للأعلى كأنها تنظر للسماء ⬆️',
+    strokeHint: 'تتبّع شكل الرقم المنقّط كاملاً بهدوء ✏️',
     fingerEmoji: '✋✌️',
     defaultTheme: 'stars',
-    checkpoints: [
-      { x: 125, y: 75 },
-      { x: 145, y: 130 },
-      { x: 160, y: 195 },
-      { x: 175, y: 130 },
-      { x: 195, y: 75 },
-    ],
   },
   {
     num: 8,
     easternChar: '٨',
     word: 'ثمانية',
-    strokeHint: 'اصعد بميل ثم انزل كالجبل تنظر للأرض ⛰️',
+    strokeHint: 'تتبّع شكل الرقم المنقّط كاملاً بهدوء ✏️',
     fingerEmoji: '✋🤟',
     defaultTheme: 'apples',
-    checkpoints: [
-      { x: 125, y: 195 },
-      { x: 145, y: 130 },
-      { x: 160, y: 75 },
-      { x: 175, y: 130 },
-      { x: 195, y: 195 },
-    ],
   },
   {
     num: 9,
     easternChar: '٩',
     word: 'تسعة',
-    strokeHint: 'ارسم دائرة في الأعلى وانزل بعصا مستقيمة 🍭',
+    strokeHint: 'تتبّع شكل الرقم المنقّط كاملاً بهدوء ✏️',
     fingerEmoji: '✋🖐️',
     defaultTheme: 'pencils',
-    checkpoints: [
-      { x: 160, y: 70 },
-      { x: 185, y: 90 },
-      { x: 160, y: 115 },
-      { x: 135, y: 90 },
-      { x: 185, y: 140 },
-      { x: 185, y: 175 },
-      { x: 185, y: 205 },
-    ],
   },
   {
     num: 10,
     easternChar: '١٠',
     word: 'عشرة',
-    strokeHint: 'ارسم الواحد وبجانبه نقطة الصفر على اليمين 🔟',
+    strokeHint: 'تتبّع شكل الرقم المنقّط كاملاً بهدوء ✏️',
     fingerEmoji: '👐',
     defaultTheme: 'stars',
-    checkpoints: [
-      { x: 135, y: 65 },
-      { x: 135, y: 110 },
-      { x: 135, y: 155 },
-      { x: 135, y: 195 },
-      { x: 185, y: 165 },
-    ],
   },
 ];
 
@@ -230,9 +134,11 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
   const [evaluationStatus, setEvaluationStatus] = useState<'idle' | 'success' | 'failed'>('idle');
   const [accuracyScore, setAccuracyScore] = useState<number | null>(null);
 
+  const currentNumIndexRef = useRef(currentNumIndex);
+  currentNumIndexRef.current = currentNumIndex;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef<boolean>(false);
-  const strokePointsRef = useRef<Point[]>([]);
+  const strokesRef = useRef<HandwritingPoint[][]>([]);
   const lastPointRef = useRef<Point | null>(null);
   const autoCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -267,7 +173,7 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
     ctx.setLineDash([]);
 
     // Dotted large numeral outline for tracing
-    ctx.font = '900 150px "Tajawal", "Readex Pro", sans-serif';
+    ctx.font = GLYPH_FONT;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
@@ -282,18 +188,6 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
     ctx.fillStyle = '#F8FAFC';
     ctx.fillText(currentGuide.easternChar, canvas.width / 2, canvas.height / 2 - 10);
 
-    // Green start indicator dot
-    const startPoint = currentGuide.checkpoints[0];
-    if (startPoint) {
-      ctx.fillStyle = '#10B981';
-      ctx.beginPath();
-      ctx.arc(startPoint.x, startPoint.y, 8, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.font = 'bold 12px "Tajawal", sans-serif';
-      ctx.fillStyle = '#059669';
-      ctx.fillText('ابدأ هنا 🟢', startPoint.x, startPoint.y - 14);
-    }
   };
 
   useEffect(() => {
@@ -304,12 +198,12 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
     } else {
       drawTemplate();
     }
-    strokePointsRef.current = [];
+    strokesRef.current = [];
     lastPointRef.current = null;
     setPointsCount(0);
     setEvaluationStatus('idle');
     setAccuracyScore(null);
-    arabicSpeech.speakNumber(currentGuide.num);
+    if (Capacitor.isNativePlatform()) arabicSpeech.speakNumber(currentGuide.num);
   }, [currentNumIndex]);
 
   useEffect(() => () => {
@@ -334,6 +228,11 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
     if (autoCheckTimerRef.current) clearTimeout(autoCheckTimerRef.current);
     autoCheckTimerRef.current = null;
     isDrawingRef.current = true;
+    if (evaluationStatus === 'failed') {
+      drawTemplate();
+      strokesRef.current = [];
+      setPointsCount(0);
+    }
     setEvaluationStatus('idle');
     setAccuracyScore(null);
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -352,9 +251,9 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
 
     soundManager.playClick();
     const startPoint = { x, y };
-    strokePointsRef.current.push(startPoint);
+    strokesRef.current.push([startPoint]);
     lastPointRef.current = startPoint;
-    setPointsCount(strokePointsRef.current.length);
+    setPointsCount(strokesRef.current.reduce((sum, stroke) => sum + stroke.length, 0));
   };
 
   const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -377,67 +276,58 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
         y: previousPoint.y + (nextPoint.y - previousPoint.y) * ratio,
       };
       ctx.lineTo(point.x, point.y);
-      strokePointsRef.current.push(point);
+      strokesRef.current[strokesRef.current.length - 1]?.push(point);
     }
     ctx.stroke();
     lastPointRef.current = nextPoint;
-    setPointsCount(strokePointsRef.current.length);
+    setPointsCount(strokesRef.current.reduce((sum, stroke) => sum + stroke.length, 0));
   };
 
-  /**
-   * STRICT ACCURACY VERIFICATION:
-   * Ensures the congratulations message ONLY appears when the writing is truly correct:
-   * 1. Minimum stroke length (must have at least 16 drawn points).
-   * 2. Must start near the start checkpoint (within 32px).
-   * 3. Must cover at least 75% of the number's actual checkpoints within 28px.
-   * 4. Out-of-bounds penalty: no more than 30% of drawn points can be far away (>45px) from the number's path.
-   */
-  const performStrictEvaluation = (showFailure = true) => {
-    const points = strokePointsRef.current;
-
-    // Ignore tiny strokes during automatic checks; report them only on explicit check.
-    if (points.length < 8) {
-      if (showFailure) {
-        setEvaluationStatus('failed');
-        setAccuracyScore(20);
-        soundManager.playWrong();
-        arabicSpeech.speak('لم تكتمل الكتابة بعد! تتبّع الخط المنقّط بالكامل');
-      }
-      return false;
+  /** Compare the child's drawn strokes with the rasterized outline shown on the canvas. */
+  const performStrictEvaluation = async (showFailure = true) => {
+    const evaluationNumIndex = currentNumIndex;
+    try {
+      await document.fonts?.ready;
+    } catch {
+      // Continue with the same system fallback font used by the canvas.
+    }
+    if (currentNumIndexRef.current !== evaluationNumIndex) return false;
+    const canvas = canvasRef.current;
+    const template = canvas ? document.createElement('canvas') : null;
+    const templateCtx = template?.getContext('2d', { willReadFrequently: true });
+    if (template && canvas && templateCtx) {
+      template.width = canvas.width;
+      template.height = canvas.height;
+      templateCtx.font = GLYPH_FONT;
+      templateCtx.textAlign = 'center';
+      templateCtx.textBaseline = 'middle';
+      templateCtx.lineCap = 'round';
+      templateCtx.lineJoin = 'round';
+      templateCtx.lineWidth = 4;
+      templateCtx.strokeStyle = '#000';
+      templateCtx.setLineDash([]);
+      templateCtx.strokeText(currentGuide.easternChar, template.width / 2, template.height / 2 - 10);
     }
 
-    const checkpoints = currentGuide.checkpoints;
-    const MATCH_RADIUS = 42;
-    const PATH_RADIUS = 48;
-
-    // 2. Count covered checkpoints
-    let matchedCount = 0;
-    checkpoints.forEach((cp) => {
-      const isMatched = points.some((p) => {
-        return Math.hypot(p.x - cp.x, p.y - cp.y) <= MATCH_RADIUS;
-      });
-      if (isMatched) matchedCount++;
-    });
-
-    const coverageRatio = matchedCount / checkpoints.length;
-
-    // 3. Check for out-of-bounds scribbles (stray points)
-    let strayCount = 0;
-    points.forEach((p) => {
-      if (distanceToGuide(p, checkpoints, currentGuide.num === 5) > PATH_RADIUS) strayCount++;
-    });
-
-    const strayRatio = strayCount / points.length;
-
-    // Calculate percentage score
-    const calculatedScore = Math.max(
-      0,
-      Math.min(100, Math.round(coverageRatio * 100 - strayRatio * 20))
-    );
-    setAccuracyScore(calculatedScore);
-
-    // Allow the child to write in either direction with a little deviation.
-    const isPassing = coverageRatio >= 0.6 && strayRatio <= 0.45;
+    const imageData = template && templateCtx
+      ? templateCtx.getImageData(0, 0, template.width, template.height).data
+      : null;
+    const alpha = imageData ? new Uint8ClampedArray(template!.width * template!.height) : null;
+    if (imageData && alpha) {
+      for (let i = 0; i < alpha.length; i++) alpha[i] = imageData[i * 4 + 3];
+    }
+    const result = alpha
+      ? matchHandwriting(strokesRef.current, alphaToMask(alpha), 320, 260, {
+          brushRadius: brushSize / 2,
+          tolerance: 10,
+          minimumPathLength: 40,
+          minimumCoverage: 0.7,
+          minimumPrecision: 0.68,
+          maximumStrokeCount: 3,
+        })
+      : { passed: false, score: 0, reason: 'missed-guide' as const };
+    setAccuracyScore(result.score);
+    const isPassing = result.passed;
 
     if (isPassing) {
       setEvaluationStatus('success');
@@ -457,7 +347,10 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
       if (showFailure) {
         setEvaluationStatus('failed');
         soundManager.playWrong();
-        arabicSpeech.speak('حاول مرة أخرى يا بطل! تتبّع الخط المنقّط بدقة دون الخروج عن المسار');
+        const feedback = result.reason === 'too-short'
+          ? 'ارسم الرقم كاملاً قبل التحقق'
+          : 'حاول مرة أخرى، تتبّع شكل الرقم المنقّط بالكامل';
+        arabicSpeech.speak(`حاول مرة أخرى يا بطل! ${feedback}`);
       }
       return false;
     }
@@ -470,7 +363,7 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
     if (autoCheckTimerRef.current) clearTimeout(autoCheckTimerRef.current);
     autoCheckTimerRef.current = setTimeout(() => {
       autoCheckTimerRef.current = null;
-      performStrictEvaluation(false);
+      void performStrictEvaluation(false);
     }, 1800);
   };
 
@@ -478,7 +371,7 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
   const handleRetry = () => {
     soundManager.playClick();
     drawTemplate();
-    strokePointsRef.current = [];
+    strokesRef.current = [];
     lastPointRef.current = null;
     setPointsCount(0);
     setEvaluationStatus('idle');
@@ -588,7 +481,7 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
                 </div>
                 {pointsCount >= 8 && (
                   <button
-                    onClick={() => performStrictEvaluation()}
+                    onClick={() => void performStrictEvaluation()}
                     className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black shadow-xs cursor-pointer shrink-0"
                   >
                     تحقق من خطي 🌟
@@ -631,7 +524,7 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
                       لم تضبط! حاول مرة أخرى يا بطل
                     </div>
                     <div className="text-[10px] text-rose-600">
-                      تتبّع الخط المنقط من النقطة الخضراء 🟢 دون الخروج عن المسار
+                      اتبع شكل الرقم المنقّط كاملاً دون خربشة خارجه
                     </div>
                   </div>
                 </div>
