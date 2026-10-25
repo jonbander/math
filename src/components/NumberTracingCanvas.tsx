@@ -23,6 +23,26 @@ interface Point {
   y: number;
 }
 
+const distanceToSegment = (point: Point, start: Point, end: Point) => {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared === 0) return Math.hypot(point.x - start.x, point.y - start.y);
+  const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared));
+  return Math.hypot(point.x - (start.x + t * dx), point.y - (start.y + t * dy));
+};
+
+const distanceToGuide = (point: Point, checkpoints: Point[], closePath: boolean) => {
+  let closest = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < checkpoints.length - 1; i++) {
+    closest = Math.min(closest, distanceToSegment(point, checkpoints[i], checkpoints[i + 1]));
+  }
+  if (closePath && checkpoints.length > 2) {
+    closest = Math.min(closest, distanceToSegment(point, checkpoints[checkpoints.length - 1], checkpoints[0]));
+  }
+  return closest;
+};
+
 interface NumberGuide {
   num: number;
   easternChar: string;
@@ -213,6 +233,7 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef<boolean>(false);
   const strokePointsRef = useRef<Point[]>([]);
+  const lastPointRef = useRef<Point | null>(null);
   const autoCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentGuide = NUMBERS_GUIDES[currentNumIndex];
@@ -284,6 +305,7 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
       drawTemplate();
     }
     strokePointsRef.current = [];
+    lastPointRef.current = null;
     setPointsCount(0);
     setEvaluationStatus('idle');
     setAccuracyScore(null);
@@ -329,7 +351,9 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
     ctx.lineJoin = 'round';
 
     soundManager.playClick();
-    strokePointsRef.current.push({ x, y });
+    const startPoint = { x, y };
+    strokePointsRef.current.push(startPoint);
+    lastPointRef.current = startPoint;
     setPointsCount(strokePointsRef.current.length);
   };
 
@@ -342,10 +366,21 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.lineTo(x, y);
+    const nextPoint = { x, y };
+    const previousPoint = lastPointRef.current ?? nextPoint;
+    const distance = Math.hypot(nextPoint.x - previousPoint.x, nextPoint.y - previousPoint.y);
+    const steps = Math.max(1, Math.ceil(distance / 6));
+    for (let step = 1; step <= steps; step++) {
+      const ratio = step / steps;
+      const point = {
+        x: previousPoint.x + (nextPoint.x - previousPoint.x) * ratio,
+        y: previousPoint.y + (nextPoint.y - previousPoint.y) * ratio,
+      };
+      ctx.lineTo(point.x, point.y);
+      strokePointsRef.current.push(point);
+    }
     ctx.stroke();
-
-    strokePointsRef.current.push({ x, y });
+    lastPointRef.current = nextPoint;
     setPointsCount(strokePointsRef.current.length);
   };
 
@@ -360,8 +395,8 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
   const performStrictEvaluation = (showFailure = true) => {
     const points = strokePointsRef.current;
 
-    // Reject if too few points (e.g. single tap or dot)
-    if (points.length < 16) {
+    // Ignore tiny strokes during automatic checks; report them only on explicit check.
+    if (points.length < 8) {
       if (showFailure) {
         setEvaluationStatus('failed');
         setAccuracyScore(20);
@@ -372,24 +407,14 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
     }
 
     const checkpoints = currentGuide.checkpoints;
-    const MATCH_RADIUS = 28; // Strict radius to ensure precision
-    const START_RADIUS = 34; // Start near the green circle
-
-    // 1. Check if the beginning of the stroke is near the start point
-    const firstFewPoints = points.slice(0, 10);
-    const startsNearBeginning = firstFewPoints.some((p) => {
-      const dx = p.x - checkpoints[0].x;
-      const dy = p.y - checkpoints[0].y;
-      return Math.sqrt(dx * dx + dy * dy) <= START_RADIUS;
-    });
+    const MATCH_RADIUS = 42;
+    const PATH_RADIUS = 48;
 
     // 2. Count covered checkpoints
     let matchedCount = 0;
     checkpoints.forEach((cp) => {
       const isMatched = points.some((p) => {
-        const dx = p.x - cp.x;
-        const dy = p.y - cp.y;
-        return Math.sqrt(dx * dx + dy * dy) <= MATCH_RADIUS;
+        return Math.hypot(p.x - cp.x, p.y - cp.y) <= MATCH_RADIUS;
       });
       if (isMatched) matchedCount++;
     });
@@ -399,12 +424,7 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
     // 3. Check for out-of-bounds scribbles (stray points)
     let strayCount = 0;
     points.forEach((p) => {
-      const isNearAnyCp = checkpoints.some((cp) => {
-        const dx = p.x - cp.x;
-        const dy = p.y - cp.y;
-        return Math.sqrt(dx * dx + dy * dy) <= 45;
-      });
-      if (!isNearAnyCp) strayCount++;
+      if (distanceToGuide(p, checkpoints, currentGuide.num === 5) > PATH_RADIUS) strayCount++;
     });
 
     const strayRatio = strayCount / points.length;
@@ -412,18 +432,12 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
     // Calculate percentage score
     const calculatedScore = Math.max(
       0,
-      Math.min(100, Math.round(coverageRatio * 100 - strayRatio * 30))
+      Math.min(100, Math.round(coverageRatio * 100 - strayRatio * 20))
     );
     setAccuracyScore(calculatedScore);
 
-    // STRICT PASS CONDITION:
-    // - Must start near beginning (or if it's circular like 5, anywhere along the ring)
-    // - Checkpoints coverage must be at least 75%
-    // - Stray scribbles must be less than 30%
-    const isPassing =
-      (startsNearBeginning || currentGuide.num === 5) &&
-      coverageRatio >= 0.75 &&
-      strayRatio <= 0.3;
+    // Allow the child to write in either direction with a little deviation.
+    const isPassing = coverageRatio >= 0.6 && strayRatio <= 0.45;
 
     if (isPassing) {
       setEvaluationStatus('success');
@@ -452,6 +466,7 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
   const stopDrawing = () => {
     if (!isDrawingRef.current) return;
     isDrawingRef.current = false;
+    lastPointRef.current = null;
     if (autoCheckTimerRef.current) clearTimeout(autoCheckTimerRef.current);
     autoCheckTimerRef.current = setTimeout(() => {
       autoCheckTimerRef.current = null;
@@ -464,6 +479,7 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
     soundManager.playClick();
     drawTemplate();
     strokePointsRef.current = [];
+    lastPointRef.current = null;
     setPointsCount(0);
     setEvaluationStatus('idle');
     setAccuracyScore(null);
@@ -570,7 +586,7 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
                   <span>✍️</span>
                   <span className="truncate">تتبّع الخط؛ سيفحص التطبيق كتابتك تلقائيًا بعد توقف قصير</span>
                 </div>
-                {pointsCount >= 16 && (
+                {pointsCount >= 8 && (
                   <button
                     onClick={() => performStrictEvaluation()}
                     className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black shadow-xs cursor-pointer shrink-0"
