@@ -1,7 +1,7 @@
 import React from 'react';
 import { soundManager } from '../utils/soundEffects';
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.0.1';
 
 interface AboutPageProps {
   onGoHome: () => void;
