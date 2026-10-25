@@ -16,6 +16,7 @@ import { AdventureGameMode } from './components/AdventureGameMode';
 import { InteractiveBalanceScale } from './components/InteractiveBalanceScale';
 import { SpeedQuizMode } from './components/SpeedQuizMode';
 import { BadgesModal } from './components/BadgesModal';
+import { AboutPage } from './components/AboutPage';
 
 const INITIAL_BADGES: AchievementBadge[] = [
   {
@@ -325,6 +326,8 @@ export default function App() {
             <SpeedQuizMode numeralSystem={numeralSystem} />
           </div>
         )}
+
+        {activeMode === 'about' && <AboutPage onGoHome={() => setActiveMode('home')} />}
       </main>
 
       {/* Badges Modal */}

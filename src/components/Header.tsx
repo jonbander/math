@@ -132,6 +132,17 @@ export const Header: React.FC<HeaderProps> = ({
           >
             🔬 الألعاب
           </button>
+          <button
+            onClick={() => {
+              soundManager.playClick();
+              onSelectMode('about');
+            }}
+            className={`px-3 py-1.5 text-xs font-black rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
+              currentMode === 'about' ? 'bg-amber-100 text-amber-900' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            حول التطبيق
+          </button>
         </nav>
 
         {/* Zone 3: Primary Actions (Numeral Toggle + Badges + Sound) */}
@@ -213,6 +224,12 @@ export const Header: React.FC<HeaderProps> = ({
           }`}
         >
           الميزان ⚖️
+        </button>
+        <button
+          onClick={() => onSelectMode('about')}
+          className={`px-2 py-1 rounded-lg ${currentMode === 'about' ? 'bg-amber-500 text-white' : 'text-slate-600'}`}
+        >
+          حول ℹ️
         </button>
       </div>
     </header>

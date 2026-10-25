@@ -13,7 +13,7 @@ export type NumeralSystem = 'eastern' | 'western' | 'both';
 
 export type GameDifficulty = 'level1' | 'level2' | 'level3'; // 1-5, 1-10, 1-20
 
-export type ActiveAppMode = 'home' | 'tracing' | 'addition' | 'subtraction' | 'scale' | 'explore' | 'adventure' | 'speedQuiz';
+export type ActiveAppMode = 'home' | 'tracing' | 'addition' | 'subtraction' | 'scale' | 'explore' | 'adventure' | 'speedQuiz' | 'about';
 
 export interface MathItemDefinition {
   id: ItemTheme;

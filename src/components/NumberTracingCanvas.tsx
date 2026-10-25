@@ -213,7 +213,6 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef<boolean>(false);
   const strokePointsRef = useRef<Point[]>([]);
-  const autoCheckTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentGuide = NUMBERS_GUIDES[currentNumIndex];
 
@@ -289,27 +288,22 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
   }, [currentNumIndex]);
 
   // Touch and mouse coordinate helpers
-  const getCanvasCoords = (e: MouseEvent | TouchEvent) => {
+  const getCanvasCoords = (e: PointerEvent) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY,
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
     };
   };
 
-  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+  const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
     e.preventDefault();
-    if (autoCheckTimerRef.current) {
-      clearTimeout(autoCheckTimerRef.current);
-      autoCheckTimerRef.current = null;
-    }
     isDrawingRef.current = true;
+    e.currentTarget.setPointerCapture(e.pointerId);
     const { x, y } = getCanvasCoords(e.nativeEvent);
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -328,7 +322,7 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
     setPointsCount(strokePointsRef.current.length);
   };
 
-  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+  const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawingRef.current) return;
     e.preventDefault();
     const { x, y } = getCanvasCoords(e.nativeEvent);
@@ -441,21 +435,11 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
   const stopDrawing = () => {
     if (!isDrawingRef.current) return;
     isDrawingRef.current = false;
-
-    // If child made a substantial stroke, schedule automatic check after a gentle pause (1.2s)
-    // allowing them to continue multi-stroke numbers without premature failure!
-    if (strokePointsRef.current.length >= 16) {
-      if (autoCheckTimerRef.current) clearTimeout(autoCheckTimerRef.current);
-      autoCheckTimerRef.current = setTimeout(() => {
-        performStrictEvaluation();
-      }, 1200);
-    }
   };
 
   // Reset and try again
   const handleRetry = () => {
     soundManager.playClick();
-    if (autoCheckTimerRef.current) clearTimeout(autoCheckTimerRef.current);
     drawTemplate();
     strokePointsRef.current = [];
     setPointsCount(0);
@@ -466,7 +450,6 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
   // Next number
   const handleNextNumber = () => {
     soundManager.playClick();
-    if (autoCheckTimerRef.current) clearTimeout(autoCheckTimerRef.current);
     if (currentNumIndex + 1 < NUMBERS_GUIDES.length) {
       setCurrentNumIndex((prev) => prev + 1);
     } else if (onProceedToMath) {
@@ -477,7 +460,6 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
   // Prev number
   const handlePrevNumber = () => {
     soundManager.playClick();
-    if (autoCheckTimerRef.current) clearTimeout(autoCheckTimerRef.current);
     if (currentNumIndex > 0) {
       setCurrentNumIndex((prev) => prev - 1);
     }
@@ -492,7 +474,6 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
             <button
               onClick={() => {
                 soundManager.playClick();
-                if (autoCheckTimerRef.current) clearTimeout(autoCheckTimerRef.current);
                 onGoHome();
               }}
               className="px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer flex items-center gap-1"
@@ -567,7 +548,7 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
                   <span>✍️</span>
                   <span className="truncate">تتبّع الخط المنقّط بالفرشاة بدقة</span>
                 </div>
-                {pointsCount >= 10 && (
+                {pointsCount >= 16 && (
                   <button
                     onClick={performStrictEvaluation}
                     className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black shadow-xs cursor-pointer shrink-0"
@@ -634,13 +615,10 @@ export const NumberTracingCanvas: React.FC<NumberTracingCanvasProps> = ({
                 ref={canvasRef}
                 width={320}
                 height={260}
-                onMouseDown={startDrawing}
-                onMouseMove={draw}
-                onMouseUp={stopDrawing}
-                onMouseLeave={stopDrawing}
-                onTouchStart={startDrawing}
-                onTouchMove={draw}
-                onTouchEnd={stopDrawing}
+                onPointerDown={startDrawing}
+                onPointerMove={draw}
+                onPointerUp={stopDrawing}
+                onPointerCancel={stopDrawing}
                 className="touch-none select-none block w-[320px] h-[260px]"
               />
 
